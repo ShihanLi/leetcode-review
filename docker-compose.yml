@@ -1,0 +1,12 @@
+services:
+  review-app:
+    build: .
+    container_name: leetcode-review
+    ports:
+      - "8000:8000"
+    volumes:
+      - review-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  review-data:

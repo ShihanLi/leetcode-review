@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>LeetCode Review</title>
+<link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+<div id="app">
+  <nav id="nav">
+    <button id="nav-review" class="nav-btn active" type="button">Review</button>
+    <button id="nav-add" class="nav-btn" type="button">Add Card</button>
+  </nav>
+
+  <section id="review-view">
+    <div id="progress"></div>
+
+    <div id="card" hidden>
+      <div id="card-header">
+        <a id="card-title" target="_blank" rel="noopener"></a>
+        <div id="card-header-right">
+          <button id="edit-btn" type="button">Edit</button>
+          <div id="timer">3:00</div>
+        </div>
+      </div>
+      <div id="editor"></div>
+
+      <button id="reveal-btn" type="button">Show Insight</button>
+
+      <div id="insight-panel" hidden>
+        <h3>Insight</h3>
+        <p id="insight-text"></p>
+      </div>
+
+      <div id="ratings" hidden>
+        <button data-rating="1" class="rating rating-again">Again</button>
+        <button data-rating="2" class="rating rating-hard">Hard</button>
+        <button data-rating="3" class="rating rating-good">Good</button>
+        <button data-rating="4" class="rating rating-easy">Easy</button>
+      </div>
+
+      <div id="edit-panel" hidden>
+        <label for="edit-url">URL</label>
+        <input type="url" id="edit-url" />
+
+        <label for="edit-title">Title</label>
+        <input type="text" id="edit-title" />
+
+        <label for="edit-insight">Insight</label>
+        <textarea id="edit-insight" rows="6"></textarea>
+
+        <div id="edit-status"></div>
+
+        <div class="edit-actions">
+          <button id="edit-save" type="button">Save</button>
+          <button id="edit-cancel" type="button">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="empty" hidden>No cards due. Nice work.</div>
+    <div id="loading">Loading...</div>
+  </section>
+
+  <section id="add-view" hidden>
+    <form id="add-form">
+      <label for="add-url">URL</label>
+      <input type="url" id="add-url" required placeholder="https://leetcode.com/problems/..." />
+
+      <label for="add-title">Title (optional, derived from URL if left blank)</label>
+      <input type="text" id="add-title" placeholder="Auto-filled from URL" />
+
+      <label for="add-insight">Insight</label>
+      <textarea id="add-insight" required rows="6" placeholder="The key idea that would lead you to the solution..."></textarea>
+
+      <button type="submit">Add Card</button>
+    </form>
+    <div id="add-status"></div>
+  </section>
+</div>
+<script type="module" src="/static/app.js"></script>
+</body>
+</html>
