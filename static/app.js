@@ -41,7 +41,152 @@ const els = {
   addTitle: document.getElementById("add-title"),
   addInsight: document.getElementById("add-insight"),
   addStatus: document.getElementById("add-status"),
+  streakBadge: document.getElementById("streak-badge"),
+  streakCount: document.getElementById("streak-count"),
+  heatmapMonths: document.getElementById("heatmap-months"),
+  heatmapDays: document.getElementById("heatmap-days"),
+  heatmapGrid: document.getElementById("heatmap-grid"),
+  heatmapTotal: document.getElementById("heatmap-total"),
+  heatmapTip: document.getElementById("heatmap-tip"),
 };
+
+const WEEKDAY_LABELS = { 1: "Mon", 3: "Wed", 5: "Fri" };
+
+function parseISODate(iso) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function toISODate(date) {
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${m}-${d}`;
+}
+
+// Scaled against the busiest day, the way GitHub calibrates to each user's own volume.
+function levelFor(count, max) {
+  if (!count) return 0;
+  return Math.min(4, Math.ceil((count / max) * 4));
+}
+
+function plural(n, word) {
+  return `${n} ${word}${n === 1 ? "" : "s"}`;
+}
+
+function ordinal(n) {
+  const suffixes = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0]);
+}
+
+function renderHeatmap({ year, grid_start, range_start, range_end, today, weeks, counts, total, max }) {
+  const gridStart = parseISODate(grid_start);
+  const rangeStart = parseISODate(range_start);
+  const rangeEnd = parseISODate(range_end);
+  // Days past today have no data to show, so the year stops at whichever comes first.
+  const lastDataDay = new Date(Math.min(rangeEnd.getTime(), parseISODate(today).getTime()));
+
+  els.heatmapTotal.textContent = `${plural(total, "review")} in ${year}`;
+  els.heatmapGrid.style.setProperty("--hm-weeks", weeks);
+  els.heatmapMonths.style.setProperty("--hm-weeks", weeks);
+  els.heatmapGrid.innerHTML = "";
+  els.heatmapMonths.innerHTML = "";
+  els.heatmapDays.innerHTML = "";
+
+  for (let row = 0; row < 7; row++) {
+    const label = document.createElement("span");
+    label.textContent = WEEKDAY_LABELS[row] || "";
+    els.heatmapDays.appendChild(label);
+  }
+
+  const cells = document.createDocumentFragment();
+  let lastLabelMonth = -1;
+  let lastLabelCol = -3;
+
+  for (let col = 0; col < weeks; col++) {
+    for (let row = 0; row < 7; row++) {
+      const day = new Date(gridStart);
+      day.setDate(gridStart.getDate() + col * 7 + row);
+
+      // Every square is drawn, including days outside the window and days still to
+      // come this week; they just carry no data and no tooltip.
+      const cell = document.createElement("div");
+      cell.className = "hm-cell";
+      cell.style.gridColumn = col + 1;
+      cell.style.gridRow = row + 1;
+
+      if (day >= rangeStart && day <= lastDataDay) {
+        const count = counts[toISODate(day)] || 0;
+        cell.dataset.level = levelFor(count, max);
+        const label = count ? plural(count, "review") : "No reviews";
+        const month = day.toLocaleDateString(undefined, { month: "long" });
+        cell.dataset.tip = `${label} on ${month} ${ordinal(day.getDate())}.`;
+      }
+      cells.appendChild(cell);
+    }
+
+    // Label each column by the first day in it that belongs to the year, so the
+    // leading days from the previous December don't produce a stray label.
+    let colDay = null;
+    for (let row = 0; row < 7 && !colDay; row++) {
+      const day = new Date(gridStart);
+      day.setDate(gridStart.getDate() + col * 7 + row);
+      if (day >= rangeStart && day <= rangeEnd) colDay = day;
+    }
+    if (colDay && colDay.getMonth() !== lastLabelMonth && col - lastLabelCol >= 3) {
+      const label = document.createElement("span");
+      label.textContent = colDay.toLocaleDateString(undefined, { month: "short" });
+      label.style.gridColumn = col + 1;
+      els.heatmapMonths.appendChild(label);
+      lastLabelMonth = colDay.getMonth();
+      lastLabelCol = col;
+    }
+  }
+
+  els.heatmapGrid.appendChild(cells);
+}
+
+function showTip(cell) {
+  els.heatmapTip.textContent = cell.dataset.tip;
+  els.heatmapTip.hidden = false;
+  const cellRect = cell.getBoundingClientRect();
+  const tipRect = els.heatmapTip.getBoundingClientRect();
+  const left = cellRect.left + cellRect.width / 2 - tipRect.width / 2;
+  const clamped = Math.max(4, Math.min(left, window.innerWidth - tipRect.width - 4));
+  els.heatmapTip.style.left = `${clamped + window.scrollX}px`;
+  els.heatmapTip.style.top = `${cellRect.top - tipRect.height - 6 + window.scrollY}px`;
+}
+
+els.heatmapGrid.addEventListener("mouseover", (e) => {
+  const cell = e.target.closest(".hm-cell");
+  if (cell && cell.dataset.tip) showTip(cell);
+});
+els.heatmapGrid.addEventListener("mouseleave", () => {
+  els.heatmapTip.hidden = true;
+});
+
+async function loadHeatmap() {
+  const res = await fetch("/api/heatmap");
+  renderHeatmap(await res.json());
+}
+
+let lastStreakCount = null;
+
+async function loadStreak() {
+  const res = await fetch("/api/streak");
+  const data = await res.json();
+  els.streakCount.textContent = data.current_streak;
+  els.streakBadge.classList.toggle("active", data.reviewed_today);
+  els.streakBadge.title = data.longest_streak
+    ? `Longest streak: ${data.longest_streak} day${data.longest_streak === 1 ? "" : "s"} · ${data.total_reviews} reviews total`
+    : "Review a card to start your streak";
+  if (lastStreakCount !== null && data.current_streak > lastStreakCount) {
+    els.streakBadge.classList.remove("bump");
+    void els.streakBadge.offsetWidth;
+    els.streakBadge.classList.add("bump");
+  }
+  lastStreakCount = data.current_streak;
+}
 
 function formatTime(sec) {
   const sign = sec < 0 ? "-" : "";
@@ -178,6 +323,8 @@ async function submitRating(rating) {
   });
   idx += 1;
   renderCard();
+  loadStreak();
+  loadHeatmap();
 }
 
 els.ratingButtons.forEach((btn) => {
@@ -245,6 +392,8 @@ els.addForm.addEventListener("submit", async (e) => {
 
 async function init() {
   await loadQueue();
+  await loadStreak();
+  await loadHeatmap();
 }
 
 init();

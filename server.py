@@ -98,6 +98,26 @@ def update_card(card_id: int, body: CardUpdateIn) -> dict:
         conn.close()
 
 
+@app.get("/api/heatmap")
+def heatmap(year: int | None = None) -> dict:
+    if year is not None and not 1970 <= year <= 9999:
+        raise HTTPException(status_code=422, detail="year out of range")
+    conn = db.connect()
+    try:
+        return db.get_review_heatmap(conn, year=year)
+    finally:
+        conn.close()
+
+
+@app.get("/api/streak")
+def streak() -> dict:
+    conn = db.connect()
+    try:
+        return db.get_streak_stats(conn)
+    finally:
+        conn.close()
+
+
 @app.post("/api/reviews/{card_id}")
 def submit_review(card_id: int, body: ReviewIn) -> dict:
     if body.rating not in (1, 2, 3, 4):

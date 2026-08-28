@@ -6,7 +6,7 @@ import json
 import re
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from fsrs import Card, Rating
@@ -172,3 +172,80 @@ def record_review(
         (card_id, int(rating), now, elapsed_seconds),
     )
     conn.commit()
+
+
+def get_review_heatmap(conn: sqlite3.Connection, *, year: int | None = None) -> dict:
+    """Per-day review counts for one calendar year, on a Sunday-aligned grid.
+
+    The grid starts on the Sunday on or before Jan 1, so the first and last columns
+    can hold cells belonging to the neighbouring years; the client draws those empty.
+    """
+    today = datetime.now(timezone.utc).date()
+    year = year or today.year
+    range_start = date(year, 1, 1)
+    range_end = date(year, 12, 31)
+    grid_start = range_start - timedelta(days=(range_start.weekday() + 1) % 7)
+    weeks = (range_end - grid_start).days // 7 + 1
+
+    rows = conn.execute(
+        """
+        SELECT date(reviewed_at) AS d, COUNT(*) AS c
+        FROM review_log
+        WHERE date(reviewed_at) BETWEEN ? AND ?
+        GROUP BY d
+        """,
+        (range_start.isoformat(), range_end.isoformat()),
+    ).fetchall()
+
+    counts = {r["d"]: r["c"] for r in rows}
+    return {
+        "year": year,
+        "grid_start": grid_start.isoformat(),
+        "range_start": range_start.isoformat(),
+        "range_end": range_end.isoformat(),
+        "today": today.isoformat(),
+        "weeks": weeks,
+        "counts": counts,
+        "total": sum(counts.values()),
+        "max": max(counts.values(), default=0),
+    }
+
+
+def get_streak_stats(conn: sqlite3.Connection) -> dict:
+    rows = conn.execute(
+        "SELECT DISTINCT date(reviewed_at) AS d FROM review_log ORDER BY d DESC"
+    ).fetchall()
+    dates = [datetime.strptime(r["d"], "%Y-%m-%d").date() for r in rows]
+    total_reviews = conn.execute("SELECT COUNT(*) AS c FROM review_log").fetchone()["c"]
+
+    if not dates:
+        return {
+            "current_streak": 0,
+            "longest_streak": 0,
+            "reviewed_today": False,
+            "total_reviews": 0,
+        }
+
+    today = datetime.now(timezone.utc).date()
+    date_set = set(dates)
+    reviewed_today = today in date_set
+
+    cursor = today if reviewed_today else today - timedelta(days=1)
+    current_streak = 0
+    while cursor in date_set:
+        current_streak += 1
+        cursor -= timedelta(days=1)
+
+    ascending = sorted(dates)
+    longest_streak = run = 1
+    for prev, curr in zip(ascending, ascending[1:]):
+        run = run + 1 if (curr - prev).days == 1 else 1
+        longest_streak = max(longest_streak, run)
+    longest_streak = max(longest_streak, current_streak)
+
+    return {
+        "current_streak": current_streak,
+        "longest_streak": longest_streak,
+        "reviewed_today": reviewed_today,
+        "total_reviews": total_reviews,
+    }

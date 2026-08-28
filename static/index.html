@@ -10,6 +10,10 @@
   <nav id="nav">
     <button id="nav-review" class="nav-btn active" type="button">Review</button>
     <button id="nav-add" class="nav-btn" type="button">Add Card</button>
+    <div id="streak-badge" class="streak-badge">
+      <span id="streak-flame" class="flame">🔥</span>
+      <span id="streak-count">0</span>
+    </div>
   </nav>
 
   <section id="review-view">
@@ -60,6 +64,26 @@
 
     <div id="empty" hidden>No cards due. Nice work.</div>
     <div id="loading">Loading...</div>
+
+    <section id="heatmap">
+      <div id="heatmap-total"></div>
+      <div id="heatmap-scroll">
+        <div id="heatmap-chart">
+          <div id="heatmap-months"></div>
+          <div id="heatmap-days"></div>
+          <div id="heatmap-grid"></div>
+        </div>
+      </div>
+      <div id="heatmap-legend">
+        <span>Less</span>
+        <div class="hm-cell" data-level="0"></div>
+        <div class="hm-cell" data-level="1"></div>
+        <div class="hm-cell" data-level="2"></div>
+        <div class="hm-cell" data-level="3"></div>
+        <div class="hm-cell" data-level="4"></div>
+        <span>More</span>
+      </div>
+    </section>
   </section>
 
   <section id="add-view" hidden>
@@ -78,6 +102,7 @@
     <div id="add-status"></div>
   </section>
 </div>
+<div id="heatmap-tip" hidden></div>
 <script type="module" src="/static/app.js"></script>
 </body>
 </html>
