@@ -10,10 +10,20 @@ from pydantic import BaseModel
 import db
 from fsrs import Rating
 
+class NoCacheStaticFiles(StaticFiles):
+    """Forces revalidation on every request so a deploy is never masked by a stale
+    cached app.js/style.css/index.html from before the update."""
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 app = FastAPI()
 
 STATIC_DIR = Path(__file__).parent / "static"
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+app.mount("/static", NoCacheStaticFiles(directory=STATIC_DIR), name="static")
 
 
 class ReviewIn(BaseModel):
@@ -35,7 +45,7 @@ class CardUpdateIn(BaseModel):
 
 @app.get("/")
 def index() -> FileResponse:
-    return FileResponse(STATIC_DIR / "index.html")
+    return FileResponse(STATIC_DIR / "index.html", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/api/queue")
