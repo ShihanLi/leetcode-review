@@ -34,13 +34,18 @@ const els = {
   editCancel: document.getElementById("edit-cancel"),
   navReview: document.getElementById("nav-review"),
   navAdd: document.getElementById("nav-add"),
+  navCards: document.getElementById("nav-cards"),
   reviewView: document.getElementById("review-view"),
   addView: document.getElementById("add-view"),
+  cardsView: document.getElementById("cards-view"),
   addForm: document.getElementById("add-form"),
   addUrl: document.getElementById("add-url"),
   addTitle: document.getElementById("add-title"),
   addInsight: document.getElementById("add-insight"),
   addStatus: document.getElementById("add-status"),
+  cardsLoading: document.getElementById("cards-loading"),
+  cardsEmpty: document.getElementById("cards-empty"),
+  cardsList: document.getElementById("cards-list"),
   streakBadge: document.getElementById("streak-badge"),
   streakCount: document.getElementById("streak-count"),
   heatmapMonths: document.getElementById("heatmap-months"),
@@ -340,20 +345,27 @@ async function loadQueue() {
   renderCard();
 }
 
+function showView(name) {
+  els.navReview.classList.toggle("active", name === "review");
+  els.navAdd.classList.toggle("active", name === "add");
+  els.navCards.classList.toggle("active", name === "cards");
+  els.reviewView.hidden = name !== "review";
+  els.addView.hidden = name !== "add";
+  els.cardsView.hidden = name !== "cards";
+}
+
 function showReviewView() {
-  els.navReview.classList.add("active");
-  els.navAdd.classList.remove("active");
-  els.reviewView.hidden = false;
-  els.addView.hidden = true;
+  showView("review");
 }
 
 function showAddView() {
-  els.navAdd.classList.add("active");
-  els.navReview.classList.remove("active");
-  els.addView.hidden = false;
-  els.reviewView.hidden = true;
+  showView("add");
   els.addStatus.textContent = "";
   els.addStatus.className = "";
+}
+
+function showCardsView() {
+  showView("cards");
 }
 
 els.navReview.addEventListener("click", () => {
@@ -361,6 +373,10 @@ els.navReview.addEventListener("click", () => {
   loadQueue();
 });
 els.navAdd.addEventListener("click", showAddView);
+els.navCards.addEventListener("click", () => {
+  showCardsView();
+  loadAllCards();
+});
 
 els.addForm.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -389,6 +405,159 @@ els.addForm.addEventListener("submit", async (e) => {
     els.addStatus.className = "status-error";
   }
 });
+
+function el(tag, props = {}, children = []) {
+  const node = document.createElement(tag);
+  Object.assign(node, props);
+  children.forEach((c) => node.appendChild(c));
+  return node;
+}
+
+function formatDue(iso) {
+  const due = new Date(iso);
+  const diffMs = due.getTime() - Date.now();
+  const past = diffMs <= 0;
+  const absMs = Math.abs(diffMs);
+
+  const minutes = Math.round(absMs / 60000);
+  const hours = Math.round(absMs / 3600000);
+  const days = Math.round(absMs / 86400000);
+
+  let span;
+  if (minutes < 1) span = "less than a minute";
+  else if (minutes < 60) span = plural(minutes, "minute");
+  else if (hours < 24) span = plural(hours, "hour");
+  else span = plural(days, "day");
+
+  return past ? `Overdue by ${span}` : `Due in ${span}`;
+}
+
+function buildCardRow(card) {
+  const dueDate = new Date(card.due);
+  const dueSpan = el("span", {
+    className: "card-row-due" + (dueDate.getTime() <= Date.now() ? " due-now" : ""),
+    textContent: formatDue(card.due),
+    title: dueDate.toLocaleString(),
+  });
+  const titleLink = el("a", {
+    className: "card-row-title",
+    href: card.url,
+    target: "_blank",
+    rel: "noopener",
+    textContent: card.title,
+  });
+
+  const editBtn = el("button", { className: "card-row-edit", type: "button", textContent: "Edit" });
+  const deleteBtn = el("button", { className: "card-row-delete", type: "button", textContent: "Delete" });
+
+  const urlInput = el("input", { type: "url", className: "card-row-edit-url", value: card.url });
+  const titleInput = el("input", { type: "text", className: "card-row-edit-title", value: card.title });
+  const insightInput = el("textarea", { rows: 4, className: "card-row-edit-insight", value: card.insight });
+  const status = el("div", { className: "card-row-edit-status" });
+  const saveBtn = el("button", { className: "card-row-save", type: "button", textContent: "Save" });
+  const cancelBtn = el("button", { className: "card-row-cancel", type: "button", textContent: "Cancel" });
+
+  const editPanel = el("div", { className: "card-row-edit-panel", hidden: true }, [
+    el("label", { textContent: "URL" }),
+    urlInput,
+    el("label", { textContent: "Title" }),
+    titleInput,
+    el("label", { textContent: "Insight" }),
+    insightInput,
+    status,
+    el("div", { className: "edit-actions" }, [saveBtn, cancelBtn]),
+  ]);
+
+  const row = el("div", { className: "card-row" }, [
+    el("div", { className: "card-row-main" }, [titleLink, dueSpan]),
+    el("div", { className: "card-row-actions" }, [editBtn, deleteBtn]),
+    editPanel,
+  ]);
+  row.dataset.id = card.id;
+  return row;
+}
+
+function resetDeleteButton(btn) {
+  btn.classList.remove("confirm");
+  btn.textContent = "Delete";
+  clearTimeout(btn._confirmTimer);
+}
+
+els.cardsList.addEventListener("click", async (e) => {
+  const row = e.target.closest(".card-row");
+  if (!row) return;
+  const id = Number(row.dataset.id);
+
+  if (e.target.classList.contains("card-row-delete")) {
+    const btn = e.target;
+    if (!btn.classList.contains("confirm")) {
+      btn.classList.add("confirm");
+      btn.textContent = "Confirm?";
+      btn._confirmTimer = setTimeout(() => resetDeleteButton(btn), 3000);
+      return;
+    }
+    resetDeleteButton(btn);
+    const res = await fetch(`/api/cards/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      row.remove();
+      if (!els.cardsList.children.length) els.cardsEmpty.hidden = false;
+    }
+    return;
+  }
+
+  if (e.target.classList.contains("card-row-edit")) {
+    const panel = row.querySelector(".card-row-edit-panel");
+    panel.hidden = !panel.hidden;
+    return;
+  }
+
+  if (e.target.classList.contains("card-row-cancel")) {
+    row.querySelector(".card-row-edit-panel").hidden = true;
+    return;
+  }
+
+  if (e.target.classList.contains("card-row-save")) {
+    const panel = row.querySelector(".card-row-edit-panel");
+    const status = panel.querySelector(".card-row-edit-status");
+    const body = {
+      url: panel.querySelector(".card-row-edit-url").value.trim(),
+      title: panel.querySelector(".card-row-edit-title").value.trim(),
+      insight: panel.querySelector(".card-row-edit-insight").value.trim(),
+    };
+    const res = await fetch(`/api/cards/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (res.ok) {
+      row.querySelector(".card-row-title").textContent = body.title;
+      row.querySelector(".card-row-title").href = body.url;
+      panel.hidden = true;
+      status.textContent = "";
+      status.className = "card-row-edit-status";
+    } else {
+      const err = await res.json().catch(() => ({}));
+      status.textContent = err.detail || "Failed to save card.";
+      status.className = "card-row-edit-status status-error";
+    }
+  }
+});
+
+async function loadAllCards() {
+  els.cardsLoading.hidden = false;
+  els.cardsEmpty.hidden = true;
+  els.cardsList.innerHTML = "";
+  const res = await fetch("/api/cards");
+  const cards = await res.json();
+  els.cardsLoading.hidden = true;
+  if (!cards.length) {
+    els.cardsEmpty.hidden = false;
+    return;
+  }
+  const fragment = document.createDocumentFragment();
+  cards.forEach((card) => fragment.appendChild(buildCardRow(card)));
+  els.cardsList.appendChild(fragment);
+}
 
 async function init() {
   await loadQueue();

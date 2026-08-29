@@ -390,3 +390,96 @@ body {
   margin-top: 0.5rem;
   font-size: 0.85rem;
 }
+
+#cards-loading, #cards-empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 3rem 0;
+}
+
+#cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.card-row {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+}
+
+.card-row-main {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.card-row-title {
+  color: #4fa3ff;
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.card-row-title:hover { text-decoration: underline; }
+
+.card-row-due {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.card-row-due.due-now { color: #ffb347; }
+
+.card-row-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+.card-row-actions button {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 0.3rem 0.7rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.card-row-actions button:hover { color: var(--text); border-color: var(--text); }
+.card-row-delete.confirm {
+  color: #ff6b6b;
+  border-color: #ff6b6b;
+}
+
+.card-row-edit-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+.card-row-edit-panel label {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.card-row-edit-panel input,
+.card-row-edit-panel textarea {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.5rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  resize: vertical;
+}
+
+.card-row-edit-status {
+  font-size: 0.85rem;
+}
+.card-row-edit-status.status-error { color: #ff6b6b; }

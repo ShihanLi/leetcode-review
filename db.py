@@ -139,6 +139,18 @@ def get_due_queue(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     ).fetchall()
 
 
+def get_all_cards(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    return conn.execute(
+        "SELECT id, slug, url, title, insight, due FROM cards ORDER BY due ASC"
+    ).fetchall()
+
+
+def delete_card(conn: sqlite3.Connection, *, card_id: int) -> bool:
+    cursor = conn.execute("DELETE FROM cards WHERE id = ?", (card_id,))
+    conn.commit()
+    return cursor.rowcount > 0
+
+
 def record_review(
     conn: sqlite3.Connection,
     *,

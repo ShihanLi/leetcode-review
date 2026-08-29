@@ -58,6 +58,26 @@ def queue() -> list[dict]:
         conn.close()
 
 
+@app.get("/api/cards")
+def list_cards() -> list[dict]:
+    conn = db.connect()
+    try:
+        rows = db.get_all_cards(conn)
+        return [
+            {
+                "id": r["id"],
+                "slug": r["slug"],
+                "url": r["url"],
+                "title": r["title"],
+                "insight": r["insight"],
+                "due": r["due"],
+            }
+            for r in rows
+        ]
+    finally:
+        conn.close()
+
+
 @app.post("/api/cards")
 def create_card(body: CardIn) -> dict:
     url = body.url.strip()
@@ -91,6 +111,18 @@ def update_card(card_id: int, body: CardUpdateIn) -> dict:
     conn = db.connect()
     try:
         ok = db.update_card(conn, card_id=card_id, url=url, title=title, insight=insight)
+        if not ok:
+            raise HTTPException(status_code=404, detail=f"no card with id {card_id}")
+        return {"ok": True}
+    finally:
+        conn.close()
+
+
+@app.delete("/api/cards/{card_id}")
+def delete_card(card_id: int) -> dict:
+    conn = db.connect()
+    try:
+        ok = db.delete_card(conn, card_id=card_id)
         if not ok:
             raise HTTPException(status_code=404, detail=f"no card with id {card_id}")
         return {"ok": True}
